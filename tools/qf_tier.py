@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -27,15 +28,33 @@ def bench(n: int) -> float:
     return round(n / dt, 1) if dt > 0 else 0.0
 
 
+def parity(n: int) -> dict[str, object]:
+    """Deterministic cross-tier checksum — SAME value on every arch/tier.
+
+    This is what turns 'ran on 3 tiers' into 'ran the SAME computation on 3
+    tiers': compare sha256_16 across tiers; a mismatch = real divergence.
+    """
+    s = bytearray([1]) * (n + 1)
+    s[0] = s[1] = 0
+    for i in range(2, int(n**0.5) + 1):
+        if s[i]:
+            s[i * i :: i] = b"\x00" * (((n - i * i) // i) + 1)
+    count = sum(s)
+    digest = hashlib.sha256(f"primes<={n}={count}".encode()).hexdigest()[:16]
+    return {"n": n, "primes": count, "sha256_16": digest}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="queueforge tier probe")
     ap.add_argument("--tier", default="local", help="local|cloud|gpu")
     ap.add_argument("--n", type=int, default=20000)
+    ap.add_argument("--parity-n", type=int, default=200000,
+                    help="deterministic cross-tier checksum size")
     args = ap.parse_args()
 
     out = {
         "tool": "qf_tier",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "tier": args.tier,
         "hostname": platform.node(),
         "machine": platform.machine(),
@@ -43,6 +62,7 @@ def main() -> int:
         "ncpu": os.cpu_count(),
         "n": args.n,
         "ops_per_s": bench(args.n),
+        "parity": parity(args.parity_n),
     }
     print(json.dumps(out, indent=2))
     return 0
