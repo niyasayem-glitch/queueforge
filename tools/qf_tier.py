@@ -81,17 +81,24 @@ def main() -> int:
                     help="skip nvidia-smi probe (fast path)")
     args = ap.parse_args()
 
+    # Env-var override (QF_TIER / QF_N / QF_PARITY_N): lets CI runners invoke
+    # this file via exec(urlopen(...)) with ZERO quotes (cyc16: GH Actions
+    # input substitution strips double-quotes+backslashes from payloads).
+    tier = os.environ.get("QF_TIER", args.tier)
+    n = int(os.environ.get("QF_N", args.n))
+    parity_n = int(os.environ.get("QF_PARITY_N", args.parity_n))
+
     out = {
         "tool": "qf_tier",
         "version": "0.3.0",
-        "tier": args.tier,
+        "tier": tier,
         "hostname": platform.node(),
         "machine": platform.machine(),
         "python": platform.python_version(),
         "ncpu": os.cpu_count(),
-        "n": args.n,
-        "ops_per_s": bench(args.n),
-        "parity": parity(args.parity_n),
+        "n": n,
+        "ops_per_s": bench(n),
+        "parity": parity(parity_n),
         "gpu": None if args.no_gpu_probe else gpu_probe(),
     }
     print(json.dumps(out, indent=2))
