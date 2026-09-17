@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    command: uvicorn api.app:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+  monitor:
+    build: .
+    command: python -c "import monitor; print(monitor.import_check()); monitor.serve(8080, 'http://api:8000/health')"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
